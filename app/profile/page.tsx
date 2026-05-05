@@ -124,8 +124,24 @@ function Inner() {
           <EditPanel
             onClose={() => setEditing(false)}
             user={user}
-            onSave={(p) => {
-              patchUser(p);
+            onSave={async (p) => {
+              const res = await fetch("/api/auth/profile", {
+                method: "PATCH",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                  displayName: p.displayName,
+                  bio: p.bio,
+                  avatar: p.avatar,
+                  color: p.color,
+                  genres: p.genres,
+                }),
+              });
+              const data = await res.json().catch(() => ({}));
+              if (!res.ok) {
+                window.alert(typeof data.error === "string" ? data.error : "Could not save profile");
+                return;
+              }
+              patchUser(data.user);
               setEditing(false);
             }}
           />
@@ -194,16 +210,17 @@ function EditPanel({
   onClose,
   onSave,
 }: {
-  user: ReturnType<typeof useApp.getState>["user"];
+  user: NonNullable<ReturnType<typeof useApp.getState>["user"]>;
   onClose: () => void;
-  onSave: (p: Partial<NonNullable<ReturnType<typeof useApp.getState>["user"]>>) => void;
+  onSave: (p: Partial<NonNullable<ReturnType<typeof useApp.getState>["user"]>>) => void | Promise<void>;
 }) {
-  const u = user!;
+  const u = user;
   const [name, setName] = useState(u.displayName);
   const [bio, setBio] = useState(u.bio ?? "");
   const [avatar, setAvatar] = useState(u.avatar);
   const [color, setColor] = useState(u.color);
   const [genres, setGenres] = useState<Genre[]>(u.genres);
+  const [busy, setBusy] = useState(false);
 
   return (
     <div className="rounded-3xl border border-border-soft bg-surface/60 p-4 space-y-4">
@@ -273,7 +290,25 @@ function EditPanel({
           })}
         </div>
       </div>
-      <Button full size="lg" onClick={() => onSave({ displayName: name.trim() || u.displayName, bio, avatar, color, genres })}>
+      <Button
+        full
+        size="lg"
+        loading={busy}
+        onClick={async () => {
+          setBusy(true);
+          try {
+            await onSave({
+              displayName: name.trim() || u.displayName,
+              bio,
+              avatar,
+              color,
+              genres,
+            });
+          } finally {
+            setBusy(false);
+          }
+        }}
+      >
         Save changes
       </Button>
     </div>

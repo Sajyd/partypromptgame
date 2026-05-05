@@ -91,7 +91,8 @@ export const useApp = create<AppState>()(
       setUser: (user) => set({ user }),
       patchUser: (patch) =>
         set((s) => (s.user ? { user: { ...s.user, ...patch } } : {})),
-      signOut: () =>
+      signOut: () => {
+        void fetch("/api/auth/logout", { method: "POST" }).catch(() => {});
         set({
           user: null,
           lobby: null,
@@ -100,7 +101,8 @@ export const useApp = create<AppState>()(
           versions: [],
           currentVersionId: null,
           generatedGame: null,
-        }),
+        });
+      },
 
       createLobby: (opts) => {
         const user = get().user;

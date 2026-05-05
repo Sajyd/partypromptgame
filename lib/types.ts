@@ -22,6 +22,7 @@ export type GameKind =
 
 export interface User {
   id: string;
+  email?: string;
   displayName: string;
   age: number;
   avatar: string; // emoji
@@ -32,6 +33,7 @@ export interface User {
   bio?: string;
   joinedAt: number;
   friendCode: string;
+  onboardingCompleted?: boolean;
   stats: {
     gamesCreated: number;
     gamesPlayed: number;

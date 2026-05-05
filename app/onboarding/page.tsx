@@ -1,16 +1,17 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { ArrowLeft, ArrowRight, Check, ShieldCheck, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { Input, FormLabel } from "@/components/ui/Input";
 import { Avatar } from "@/components/ui/Avatar";
+import { AuthGate } from "@/components/AuthGate";
 import { useApp } from "@/lib/store";
 import { AVATARS, COLORS, GENRES } from "@/lib/mock-data";
 import type { Genre, PlayStyle, SkillLevel } from "@/lib/types";
-import { cn, randomCode, uid } from "@/lib/utils";
+import { cn } from "@/lib/utils";
 
 const STEPS = ["name", "age", "avatar", "playstyle", "skill", "genres", "done"] as const;
 type StepId = (typeof STEPS)[number];
@@ -38,9 +39,19 @@ const SKILLS: Array<{
 ];
 
 export default function Onboarding() {
+  return (
+    <AuthGate mode="onboarding">
+      <OnboardingInner />
+    </AuthGate>
+  );
+}
+
+function OnboardingInner() {
   const router = useRouter();
+  const existingUser = useApp((s) => s.user);
   const setUser = useApp((s) => s.setUser);
   const [step, setStep] = useState<StepId>("name");
+  const [saving, setSaving] = useState(false);
 
   const [name, setName] = useState("");
   const [age, setAge] = useState("");
@@ -49,6 +60,12 @@ export default function Onboarding() {
   const [playStyle, setPlayStyle] = useState<PlayStyle>("creative");
   const [skill, setSkill] = useState<SkillLevel>("casual");
   const [genres, setGenres] = useState<Genre[]>([]);
+
+  useEffect(() => {
+    if (existingUser?.displayName && name === "") {
+      setName(existingUser.displayName);
+    }
+  }, [existingUser?.displayName, name]);
 
   const stepIndex = STEPS.indexOf(step);
 
@@ -65,21 +82,35 @@ export default function Onboarding() {
     setStep(STEPS[stepIndex - 1]);
   };
 
-  const finish = () => {
-    setUser({
-      id: uid("u"),
-      displayName: name.trim() || "Player",
-      age: parseInt(age) || 18,
-      avatar,
-      color,
-      playStyle,
-      skill,
-      genres,
-      friendCode: randomCode(8),
-      joinedAt: Date.now(),
-      stats: { gamesCreated: 0, gamesPlayed: 0, contributions: 0, likes: 0 },
-    });
-    router.replace("/home");
+  const finish = async () => {
+    setSaving(true);
+    try {
+      const res = await fetch("/api/auth/profile", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          displayName: name.trim() || "Player",
+          age: parseInt(age, 10) || 18,
+          avatar,
+          color,
+          playStyle,
+          skill,
+          genres,
+          onboardingCompleted: true,
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        window.alert(typeof data.error === "string" ? data.error : "Could not save profile");
+        setSaving(false);
+        return;
+      }
+      setUser(data.user);
+      router.replace("/home");
+    } catch {
+      window.alert("Network error");
+      setSaving(false);
+    }
   };
 
   const canContinue = (() => {
@@ -351,7 +382,7 @@ export default function Onboarding() {
         <div className="fixed bottom-0 left-0 right-0 pb-[env(safe-area-inset-bottom)]">
           <div className="mx-auto w-full max-w-[480px] px-5 pb-5">
             {step === "done" ? (
-              <Button full size="xl" onClick={finish}>
+              <Button full size="xl" loading={saving} onClick={() => void finish()}>
                 Let's go <ArrowRight className="size-5" />
               </Button>
             ) : (

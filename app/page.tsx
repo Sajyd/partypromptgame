@@ -90,14 +90,20 @@ export default function Landing() {
           ) : (
             <>
               <Link
-                href="/onboarding"
+                href="/signup"
                 className="h-14 px-6 inline-flex items-center justify-center gap-2 rounded-2xl font-semibold text-black [background:var(--grad-hero)] shadow-[0_10px_30px_-10px_rgba(255,77,168,0.55)]"
               >
                 Get started <ArrowRight className="size-5" />
               </Link>
               <Link
-                href="/browse"
+                href="/login"
                 className="h-12 px-5 inline-flex items-center justify-center gap-2 rounded-2xl font-semibold bg-white/8 hover:bg-white/12 border border-white/10 text-text"
+              >
+                Log in
+              </Link>
+              <Link
+                href="/browse"
+                className="h-12 px-5 inline-flex items-center justify-center gap-2 rounded-2xl font-semibold bg-transparent hover:bg-white/5 border border-white/10 text-text-soft"
               >
                 Browse community games
               </Link>
