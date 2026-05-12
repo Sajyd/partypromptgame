@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/Button";
 import { Input, FormLabel } from "@/components/ui/Input";
 import { useApp } from "@/lib/store";
 import { APP_NAME } from "@/lib/brand";
+import { GoogleSignInLink } from "@/components/auth/GoogleSignInLink";
 
 export default function SignupPage() {
   const router = useRouter();
@@ -80,7 +81,16 @@ export default function SignupPage() {
           </p>
         </motion.div>
 
-        <form onSubmit={submit} className="mt-8 space-y-5">
+        <div className="mt-8 space-y-5">
+          <GoogleSignInLink />
+          <div className="flex items-center gap-3 text-xs text-text-muted uppercase tracking-wider">
+            <span className="h-px flex-1 bg-white/10" />
+            or email
+            <span className="h-px flex-1 bg-white/10" />
+          </div>
+        </div>
+
+        <form onSubmit={submit} className="mt-6 space-y-5">
           <div>
             <FormLabel>Display name</FormLabel>
             <Input

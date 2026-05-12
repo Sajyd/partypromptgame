@@ -139,9 +139,26 @@ export default function Landing() {
           </motion.div>
         </div>
 
-        <div className="mt-16 lg:mt-20 text-center text-xs text-text-muted">
-          Made for 😂 with friends.
-        </div>
+        <footer className="mt-16 lg:mt-20 flex flex-col items-center gap-3 text-center text-xs text-text-muted">
+          <p>Made for 😂 with friends.</p>
+          <nav className="flex flex-wrap items-center justify-center gap-x-4 gap-y-1" aria-label="Legal">
+            <Link href="/privacy" className="hover:text-text-soft transition-colors">
+              Privacy
+            </Link>
+            <span className="text-border-soft" aria-hidden>
+              ·
+            </span>
+            <Link href="/terms" className="hover:text-text-soft transition-colors">
+              Terms
+            </Link>
+            <span className="text-border-soft" aria-hidden>
+              ·
+            </span>
+            <Link href="/privacy#notifications" className="hover:text-text-soft transition-colors">
+              Push notifications
+            </Link>
+          </nav>
+        </footer>
       </div>
     </main>
   );

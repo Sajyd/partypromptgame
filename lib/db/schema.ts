@@ -20,7 +20,8 @@ export type UserStatsRow = {
 export const users = pgTable("users", {
   id: uuid("id").primaryKey().defaultRandom(),
   email: varchar("email", { length: 255 }).notNull().unique(),
-  passwordHash: varchar("password_hash", { length: 255 }).notNull(),
+  passwordHash: varchar("password_hash", { length: 255 }),
+  googleId: varchar("google_id", { length: 128 }).unique(),
   displayName: varchar("display_name", { length: 18 }).notNull(),
   age: integer("age").notNull(),
   avatar: varchar("avatar", { length: 8 }).notNull(),
@@ -34,4 +35,15 @@ export const users = pgTable("users", {
   onboardingCompleted: boolean("onboarding_completed").notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const pushSubscriptions = pgTable("push_subscriptions", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  userId: uuid("user_id")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  endpoint: text("endpoint").notNull().unique(),
+  p256dh: text("p256dh").notNull(),
+  auth: text("auth").notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
 });

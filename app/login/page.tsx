@@ -1,22 +1,38 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { Suspense, useState } from "react";
 import { motion } from "framer-motion";
 import { ArrowLeft, ArrowRight, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { Input, FormLabel } from "@/components/ui/Input";
 import { useApp } from "@/lib/store";
 import { APP_NAME } from "@/lib/brand";
+import { GoogleSignInLink } from "@/components/auth/GoogleSignInLink";
 
-export default function LoginPage() {
+const OAUTH_ERRORS: Record<string, string> = {
+  missing_config: "Google sign-in is not configured on this server.",
+  invalid: "Sign-in was cancelled or the session expired. Try again.",
+  token: "Could not complete Google sign-in. Try again.",
+  profile: "Could not load your Google profile. Try again.",
+  email: "Google did not return a verified email for this account.",
+  account_conflict: "This email is already linked to another Google account.",
+  duplicate: "An account with this email already exists. Try signing in.",
+  server: "Something went wrong. Try again later.",
+};
+
+function LoginForm() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const setUser = useApp((s) => s.setUser);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+
+  const oauthCode = searchParams.get("oauth");
+  const oauthMessage = oauthCode ? OAUTH_ERRORS[oauthCode] ?? "Google sign-in failed." : null;
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -77,7 +93,16 @@ export default function LoginPage() {
           <p className="mt-2 text-text-soft">Sign in to continue to your lobbies and games.</p>
         </motion.div>
 
-        <form onSubmit={submit} className="mt-8 space-y-5">
+        <div className="mt-8 space-y-5">
+          <GoogleSignInLink />
+          <div className="flex items-center gap-3 text-xs text-text-muted uppercase tracking-wider">
+            <span className="h-px flex-1 bg-white/10" />
+            or email
+            <span className="h-px flex-1 bg-white/10" />
+          </div>
+        </div>
+
+        <form onSubmit={submit} className="mt-6 space-y-5">
           <div>
             <FormLabel>Email</FormLabel>
             <Input
@@ -102,6 +127,11 @@ export default function LoginPage() {
               required
             />
           </div>
+          {oauthMessage ? (
+            <div className="rounded-2xl border border-[var(--danger)]/40 bg-[var(--danger)]/10 px-4 py-3 text-sm text-[var(--danger)]">
+              {oauthMessage}
+            </div>
+          ) : null}
           {error ? (
             <div className="rounded-2xl border border-[var(--danger)]/40 bg-[var(--danger)]/10 px-4 py-3 text-sm text-[var(--danger)]">
               {error}
@@ -120,5 +150,19 @@ export default function LoginPage() {
         </p>
       </div>
     </main>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="flex items-center justify-center min-h-dvh">
+          <div className="size-10 rounded-full border-4 border-white/10 border-t-[var(--primary)] animate-spin" />
+        </div>
+      }
+    >
+      <LoginForm />
+    </Suspense>
   );
 }

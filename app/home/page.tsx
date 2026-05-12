@@ -2,7 +2,8 @@
 
 import Link from "next/link";
 import { motion } from "framer-motion";
-import { Sparkles, Plus, Hash, Users, Compass, Bell, Settings } from "lucide-react";
+import { Sparkles, Plus, Hash, Users, Compass, Settings } from "lucide-react";
+import { NotificationPushButton } from "@/components/NotificationPushButton";
 import { AuthGate } from "@/components/AuthGate";
 import { BottomNav } from "@/components/ui/BottomNav";
 import { useApp } from "@/lib/store";
@@ -47,14 +48,7 @@ function Inner() {
             >
               <Settings className="size-5" />
             </Link>
-            <button
-              type="button"
-              className="h-10 w-10 rounded-2xl bg-white/5 hover:bg-white/10 border border-white/10 grid place-items-center relative"
-              aria-label="Notifications"
-            >
-              <Bell className="size-5" />
-              <span className="absolute top-2 right-2 size-2 rounded-full bg-[var(--primary)]" />
-            </button>
+            <NotificationPushButton />
           </div>
         </div>
 
