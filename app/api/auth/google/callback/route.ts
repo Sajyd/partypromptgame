@@ -1,4 +1,4 @@
-import { eq } from "drizzle-orm";
+import type { User as PrismaUser } from "@prisma/client";
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 import { getRequestOrigin } from "@/lib/auth/app-url";
@@ -7,7 +7,7 @@ import {
   fetchGoogleUserInfo,
 } from "@/lib/auth/google-oauth";
 import { createSessionToken, setSessionCookie } from "@/lib/auth/session";
-import { getDb, schema } from "@/lib/db";
+import { prisma } from "@/lib/db";
 import { AVATARS, COLORS } from "@/lib/mock-data";
 import { randomCodeSecure } from "@/lib/server/random-code";
 
@@ -78,36 +78,26 @@ export async function GET(req: Request) {
     return loginRedirect(origin, "server");
   }
 
-  let userRow: typeof schema.users.$inferSelect | undefined;
+  let userRow: PrismaUser | undefined;
 
   try {
-    const db = getDb();
-
-    const [byGoogle] = await db
-      .select()
-      .from(schema.users)
-      .where(eq(schema.users.googleId, sub))
-      .limit(1);
-
-    userRow = byGoogle;
+    const byGoogle = await prisma.user.findFirst({
+      where: { googleId: sub },
+    });
+    userRow = byGoogle ?? undefined;
 
     if (!userRow) {
-      const [byEmail] = await db
-        .select()
-        .from(schema.users)
-        .where(eq(schema.users.email, email))
-        .limit(1);
-
+      const byEmail = await prisma.user.findUnique({
+        where: { email },
+      });
       if (byEmail) {
         if (byEmail.googleId && byEmail.googleId !== sub) {
           return loginRedirect(origin, "account_conflict");
         }
-        const [linked] = await db
-          .update(schema.users)
-          .set({ googleId: sub, updatedAt: new Date() })
-          .where(eq(schema.users.id, byEmail.id))
-          .returning();
-        userRow = linked ?? undefined;
+        userRow = await prisma.user.update({
+          where: { id: byEmail.id },
+          data: { googleId: sub },
+        });
       }
     }
 
@@ -115,9 +105,8 @@ export async function GET(req: Request) {
       const friendCode = randomCodeSecure(8);
       const av = AVATARS[hashPick(sub, AVATARS.length)]!;
       const col = COLORS[hashPick(sub + "c", COLORS.length)]!;
-      const [inserted] = await db
-        .insert(schema.users)
-        .values({
+      userRow = await prisma.user.create({
+        data: {
           email,
           googleId: sub,
           passwordHash: null,
@@ -136,9 +125,8 @@ export async function GET(req: Request) {
             likes: 0,
           },
           onboardingCompleted: false,
-        })
-        .returning();
-      userRow = inserted ?? undefined;
+        },
+      });
     }
   } catch (e: unknown) {
     const msg = e instanceof Error ? e.message : "";

@@ -1,6 +1,5 @@
 import webpush from "web-push";
-import { eq } from "drizzle-orm";
-import { getDb, schema } from "@/lib/db";
+import { prisma } from "@/lib/db";
 import { configureWebPushForSend, isWebPushConfigured } from "@/lib/push/config";
 
 export type PushPayload = { title: string; body: string };
@@ -9,10 +8,9 @@ export type PushPayload = { title: string; body: string };
 export async function sendPushToUser(userId: string, payload: PushPayload): Promise<void> {
   if (!isWebPushConfigured()) return;
   configureWebPushForSend();
-  const subs = await getDb()
-    .select()
-    .from(schema.pushSubscriptions)
-    .where(eq(schema.pushSubscriptions.userId, userId));
+  const subs = await prisma.pushSubscription.findMany({
+    where: { userId },
+  });
 
   const data = JSON.stringify(payload);
 
@@ -29,9 +27,9 @@ export async function sendPushToUser(userId: string, payload: PushPayload): Prom
             ? (e as { statusCode?: number }).statusCode
             : undefined;
         if (status === 410 || status === 404) {
-          await getDb()
-            .delete(schema.pushSubscriptions)
-            .where(eq(schema.pushSubscriptions.endpoint, s.endpoint));
+          await prisma.pushSubscription.deleteMany({
+            where: { endpoint: s.endpoint },
+          });
         }
       }
     }),

@@ -1,5 +1,5 @@
-import { eq } from "drizzle-orm";
-import { getDb, schema } from "@/lib/db";
+import { Prisma } from "@prisma/client";
+import { prisma } from "@/lib/db";
 import { getSessionUserId } from "@/lib/auth/session";
 import { onboardingProfileSchema, patchProfileSchema } from "@/lib/auth/validation";
 import { rowToClientUser } from "@/lib/auth/map-user";
@@ -19,26 +19,24 @@ export async function PATCH(req: Request) {
 
   const onboard = onboardingProfileSchema.safeParse(body);
   if (onboard.success) {
-    const [updated] = await getDb()
-      .update(schema.users)
-      .set({
-        displayName: onboard.data.displayName,
-        age: onboard.data.age,
-        avatar: onboard.data.avatar,
-        color: onboard.data.color,
-        playStyle: onboard.data.playStyle,
-        skill: onboard.data.skill,
-        genres: onboard.data.genres,
-        onboardingCompleted: true,
-        updatedAt: new Date(),
-      })
-      .where(eq(schema.users.id, userId))
-      .returning();
-
-    if (!updated) {
+    try {
+      const updated = await prisma.user.update({
+        where: { id: userId },
+        data: {
+          displayName: onboard.data.displayName,
+          age: onboard.data.age,
+          avatar: onboard.data.avatar,
+          color: onboard.data.color,
+          playStyle: onboard.data.playStyle,
+          skill: onboard.data.skill,
+          genres: onboard.data.genres,
+          onboardingCompleted: true,
+        },
+      });
+      return Response.json({ user: rowToClientUser(updated) });
+    } catch {
       return Response.json({ error: "Not found" }, { status: 404 });
     }
-    return Response.json({ user: rowToClientUser(updated) });
   }
 
   const patch = patchProfileSchema.safeParse(body);
@@ -60,24 +58,20 @@ export async function PATCH(req: Request) {
     return Response.json({ error: "Nothing to update" }, { status: 400 });
   }
 
-  const updates: Partial<typeof schema.users.$inferInsert> = {
-    updatedAt: new Date(),
-  };
+  const updates: Prisma.UserUpdateInput = {};
   if (data.displayName !== undefined) updates.displayName = data.displayName;
   if (data.bio !== undefined) updates.bio = data.bio || null;
   if (data.avatar !== undefined) updates.avatar = data.avatar;
   if (data.color !== undefined) updates.color = data.color;
   if (data.genres !== undefined) updates.genres = data.genres;
 
-  const [updated] = await getDb()
-    .update(schema.users)
-    .set(updates)
-    .where(eq(schema.users.id, userId))
-    .returning();
-
-  if (!updated) {
+  try {
+    const updated = await prisma.user.update({
+      where: { id: userId },
+      data: updates,
+    });
+    return Response.json({ user: rowToClientUser(updated) });
+  } catch {
     return Response.json({ error: "Not found" }, { status: 404 });
   }
-
-  return Response.json({ user: rowToClientUser(updated) });
 }

@@ -1,5 +1,4 @@
-import { eq } from "drizzle-orm";
-import { getDb, schema } from "@/lib/db";
+import { prisma } from "@/lib/db";
 import { verifyPassword } from "@/lib/auth/password";
 import { createSessionToken, setSessionCookie } from "@/lib/auth/session";
 import { loginSchema } from "@/lib/auth/validation";
@@ -20,11 +19,9 @@ export async function POST(req: Request) {
 
   const { email, password } = parsed.data;
 
-  const [user] = await getDb()
-    .select()
-    .from(schema.users)
-    .where(eq(schema.users.email, email.toLowerCase()))
-    .limit(1);
+  const user = await prisma.user.findUnique({
+    where: { email: email.toLowerCase() },
+  });
 
   if (!user) {
     return Response.json({ error: "Invalid email or password" }, { status: 401 });

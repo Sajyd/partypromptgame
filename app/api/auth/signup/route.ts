@@ -1,4 +1,4 @@
-import { getDb, schema } from "@/lib/db";
+import { prisma } from "@/lib/db";
 import { hashPassword } from "@/lib/auth/password";
 import { createSessionToken, setSessionCookie } from "@/lib/auth/session";
 import { signupSchema } from "@/lib/auth/validation";
@@ -28,9 +28,8 @@ export async function POST(req: Request) {
   const friendCode = randomCodeSecure(8);
 
   try {
-    const [inserted] = await getDb()
-      .insert(schema.users)
-      .values({
+    const inserted = await prisma.user.create({
+      data: {
         email: email.toLowerCase(),
         passwordHash,
         displayName,
@@ -48,12 +47,8 @@ export async function POST(req: Request) {
           likes: 0,
         },
         onboardingCompleted: false,
-      })
-      .returning();
-
-    if (!inserted) {
-      return Response.json({ error: "Could not create account" }, { status: 500 });
-    }
+      },
+    });
 
     const token = await createSessionToken(inserted.id);
     await setSessionCookie(token);

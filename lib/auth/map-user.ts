@@ -1,9 +1,7 @@
-import type { PlayStyle, SkillLevel, User } from "@/lib/types";
-import type { users } from "@/lib/db/schema";
+import type { User as PrismaUser } from "@prisma/client";
+import type { Genre, PlayStyle, SkillLevel, User } from "@/lib/types";
 
-type UserRow = typeof users.$inferSelect;
-
-export function rowToClientUser(row: UserRow): User {
+export function rowToClientUser(row: PrismaUser): User {
   return {
     id: row.id,
     displayName: row.displayName,
@@ -12,11 +10,11 @@ export function rowToClientUser(row: UserRow): User {
     color: row.color,
     playStyle: row.playStyle as PlayStyle,
     skill: row.skill as SkillLevel,
-    genres: row.genres,
+    genres: row.genres as Genre[],
     bio: row.bio ?? undefined,
     joinedAt: row.createdAt.getTime(),
     friendCode: row.friendCode,
-    stats: row.stats,
+    stats: row.stats as User["stats"],
     onboardingCompleted: row.onboardingCompleted,
     email: row.email,
   };

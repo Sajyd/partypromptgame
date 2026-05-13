@@ -1,6 +1,5 @@
-import { and, eq } from "drizzle-orm";
 import { z } from "zod";
-import { getDb, schema } from "@/lib/db";
+import { prisma } from "@/lib/db";
 import { getSessionUserId } from "@/lib/auth/session";
 
 const subscribeBodySchema = z.object({
@@ -34,24 +33,21 @@ export async function POST(req: Request) {
   }
 
   const { endpoint, keys } = parsed.data;
-  const db = getDb();
 
-  await db
-    .insert(schema.pushSubscriptions)
-    .values({
+  await prisma.pushSubscription.upsert({
+    where: { endpoint },
+    create: {
       userId,
       endpoint,
       p256dh: keys.p256dh,
       auth: keys.auth,
-    })
-    .onConflictDoUpdate({
-      target: schema.pushSubscriptions.endpoint,
-      set: {
-        userId,
-        p256dh: keys.p256dh,
-        auth: keys.auth,
-      },
-    });
+    },
+    update: {
+      userId,
+      p256dh: keys.p256dh,
+      auth: keys.auth,
+    },
+  });
 
   return Response.json({ ok: true });
 }
@@ -74,14 +70,12 @@ export async function DELETE(req: Request) {
     return Response.json({ error: "Invalid body" }, { status: 400 });
   }
 
-  await getDb()
-    .delete(schema.pushSubscriptions)
-    .where(
-      and(
-        eq(schema.pushSubscriptions.endpoint, parsed.data.endpoint),
-        eq(schema.pushSubscriptions.userId, userId),
-      ),
-    );
+  await prisma.pushSubscription.deleteMany({
+    where: {
+      endpoint: parsed.data.endpoint,
+      userId,
+    },
+  });
 
   return Response.json({ ok: true });
 }

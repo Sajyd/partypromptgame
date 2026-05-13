@@ -1,25 +1,10 @@
-import { neon } from "@neondatabase/serverless";
-import { drizzle } from "drizzle-orm/neon-http";
-import type { NeonHttpDatabase } from "drizzle-orm/neon-http";
-import * as schema from "./schema";
+import { PrismaClient } from "@prisma/client";
 
-function requireDatabaseUrl(): string {
-  const url = process.env.DATABASE_URL;
-  if (!url) {
-    throw new Error("DATABASE_URL is not set");
-  }
-  return url;
+const globalForPrisma = globalThis as unknown as { prisma?: PrismaClient };
+
+export const prisma =
+  globalForPrisma.prisma ?? new PrismaClient();
+
+if (process.env.NODE_ENV !== "production") {
+  globalForPrisma.prisma = prisma;
 }
-
-export type AppDb = NeonHttpDatabase<typeof schema>;
-
-let cached: AppDb | undefined;
-
-export function getDb(): AppDb {
-  if (!cached) {
-    cached = drizzle(neon(requireDatabaseUrl()), { schema });
-  }
-  return cached;
-}
-
-export { schema };
