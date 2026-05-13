@@ -1,6 +1,6 @@
 import { eq } from "drizzle-orm";
 import { cookies } from "next/headers";
-import { redirect } from "next/navigation";
+import { NextResponse } from "next/server";
 import { getRequestOrigin } from "@/lib/auth/app-url";
 import {
   exchangeGoogleAuthorizationCode,
@@ -27,7 +27,15 @@ function displayNameFromGoogle(name: string | undefined, email: string): string 
   return raw.length >= 2 ? raw : fromEmail.slice(0, 18);
 }
 
+function loginRedirect(origin: string, oauth: string) {
+  const u = new URL("/login", origin);
+  u.searchParams.set("oauth", oauth);
+  return NextResponse.redirect(u);
+}
+
 export async function GET(req: Request) {
+  const origin = getRequestOrigin(req);
+
   const jar = await cookies();
   const savedState = jar.get(STATE_COOKIE)?.value;
   jar.set(STATE_COOKIE, "", { maxAge: 0, path: "/" });
@@ -38,67 +46,75 @@ export async function GET(req: Request) {
   const oauthError = url.searchParams.get("error");
 
   if (oauthError || !code || !state || !savedState || state !== savedState) {
-    redirect("/login?oauth=invalid");
+    return loginRedirect(origin, "invalid");
   }
 
-  const origin = getRequestOrigin(req);
   const redirectUri = `${origin}/api/auth/google/callback`;
 
   let accessToken: string;
   try {
     accessToken = await exchangeGoogleAuthorizationCode(code, redirectUri);
-  } catch {
-    redirect("/login?oauth=token");
+  } catch (e: unknown) {
+    console.error("[google/oauth/callback] token exchange failed:", e);
+    return loginRedirect(origin, "token");
   }
 
   let googleUser: Awaited<ReturnType<typeof fetchGoogleUserInfo>>;
   try {
     googleUser = await fetchGoogleUserInfo(accessToken);
-  } catch {
-    redirect("/login?oauth=profile");
+  } catch (e: unknown) {
+    console.error("[google/oauth/callback] userinfo failed:", e);
+    return loginRedirect(origin, "profile");
   }
 
   const sub = googleUser.sub;
   const email = googleUser.email?.toLowerCase().trim();
   if (!email || googleUser.email_verified === false) {
-    redirect("/login?oauth=email");
+    return loginRedirect(origin, "email");
   }
 
-  const db = getDb();
+  if (!process.env.AUTH_SECRET?.trim()) {
+    console.error("[google/oauth/callback] AUTH_SECRET is not set");
+    return loginRedirect(origin, "server");
+  }
 
-  const [byGoogle] = await db
-    .select()
-    .from(schema.users)
-    .where(eq(schema.users.googleId, sub))
-    .limit(1);
+  let userRow: typeof schema.users.$inferSelect | undefined;
 
-  let userRow = byGoogle;
+  try {
+    const db = getDb();
 
-  if (!userRow) {
-    const [byEmail] = await db
+    const [byGoogle] = await db
       .select()
       .from(schema.users)
-      .where(eq(schema.users.email, email))
+      .where(eq(schema.users.googleId, sub))
       .limit(1);
 
-    if (byEmail) {
-      if (byEmail.googleId && byEmail.googleId !== sub) {
-        redirect("/login?oauth=account_conflict");
-      }
-      const [linked] = await db
-        .update(schema.users)
-        .set({ googleId: sub, updatedAt: new Date() })
-        .where(eq(schema.users.id, byEmail.id))
-        .returning();
-      userRow = linked;
-    }
-  }
+    userRow = byGoogle;
 
-  if (!userRow) {
-    const friendCode = randomCodeSecure(8);
-    const av = AVATARS[hashPick(sub, AVATARS.length)]!;
-    const col = COLORS[hashPick(sub + "c", COLORS.length)]!;
-    try {
+    if (!userRow) {
+      const [byEmail] = await db
+        .select()
+        .from(schema.users)
+        .where(eq(schema.users.email, email))
+        .limit(1);
+
+      if (byEmail) {
+        if (byEmail.googleId && byEmail.googleId !== sub) {
+          return loginRedirect(origin, "account_conflict");
+        }
+        const [linked] = await db
+          .update(schema.users)
+          .set({ googleId: sub, updatedAt: new Date() })
+          .where(eq(schema.users.id, byEmail.id))
+          .returning();
+        userRow = linked ?? undefined;
+      }
+    }
+
+    if (!userRow) {
+      const friendCode = randomCodeSecure(8);
+      const av = AVATARS[hashPick(sub, AVATARS.length)]!;
+      const col = COLORS[hashPick(sub + "c", COLORS.length)]!;
       const [inserted] = await db
         .insert(schema.users)
         .values({
@@ -122,26 +138,31 @@ export async function GET(req: Request) {
           onboardingCompleted: false,
         })
         .returning();
-      userRow = inserted;
-    } catch (e: unknown) {
-      const msg = e instanceof Error ? e.message : "";
-      if (msg.includes("unique") || msg.includes("duplicate")) {
-        redirect("/login?oauth=duplicate");
-      }
-      console.error(e);
-      redirect("/login?oauth=server");
+      userRow = inserted ?? undefined;
     }
+  } catch (e: unknown) {
+    const msg = e instanceof Error ? e.message : "";
+    console.error("[google/oauth/callback] database error:", e);
+    if (msg.includes("unique") || msg.includes("duplicate")) {
+      return loginRedirect(origin, "duplicate");
+    }
+    return loginRedirect(origin, "server");
   }
 
   if (!userRow) {
-    redirect("/login?oauth=server");
+    return loginRedirect(origin, "server");
   }
 
-  const token = await createSessionToken(userRow.id);
-  await setSessionCookie(token);
+  try {
+    const token = await createSessionToken(userRow.id);
+    await setSessionCookie(token);
+  } catch (e: unknown) {
+    console.error("[google/oauth/callback] session cookie / JWT:", e);
+    return loginRedirect(origin, "server");
+  }
 
   if (userRow.onboardingCompleted) {
-    redirect("/home");
+    return NextResponse.redirect(new URL("/home", origin));
   }
-  redirect("/onboarding");
+  return NextResponse.redirect(new URL("/onboarding", origin));
 }
